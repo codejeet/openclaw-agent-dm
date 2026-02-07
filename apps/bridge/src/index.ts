@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
@@ -25,14 +27,31 @@ const broadcast = makeBroadcaster(wss);
 
 const BRIDGE_ID = process.env.OADM_BRIDGE_ID ?? 'bridge:' + nanoid();
 
-// Load bridge keypair from db (created by CLI init)
-const identityRow = db
+// Load bridge keypair. Preferred source (MVP): OADM_HOME/identity.json created by CLI init.
+// Fallback: sqlite identity table.
+let identityRow = db
   .prepare('select id, pubKey, privKey from identity limit 1')
   .get() as { id: string; pubKey: string; privKey: string } | undefined;
 
 if (!identityRow) {
-  console.error('No identity found. Run `npx oadm init` first.');
-  process.exit(1);
+  try {
+    const home = resolveOadmHome();
+    const idPath = path.join(home, 'identity.json');
+    const raw = JSON.parse(fs.readFileSync(idPath, 'utf8')) as any;
+    identityRow = {
+      id: String(raw.bridgeId),
+      pubKey: JSON.stringify(raw.publicJwk),
+      privKey: JSON.stringify(raw.privateJwk),
+    };
+
+    // Persist into DB for future boots.
+    db.prepare(
+      'insert or replace into identity(id, pubKey, privKey, createdAt) values(?,?,?,?)'
+    ).run(identityRow.id, identityRow.pubKey, identityRow.privKey, raw.createdAt ?? new Date().toISOString());
+  } catch {
+    console.error('No identity found. Run `npx oadm init` first.');
+    process.exit(1);
+  }
 }
 
 const publicJwk = JSON.parse(identityRow.pubKey) as any;

@@ -94,9 +94,23 @@ program
     console.log('Auth token (paste into web UI):', chalk.yellow(cfg.authToken));
 
     console.log('\nStarting bridge...');
-    const bridgeEntry = path.join(process.cwd(), 'apps/bridge/src/index.ts');
-    // Run from monorepo checkout: use pnpm -C apps/bridge dev for dev; for now spawn tsx.
-    await execa('pnpm', ['-C', path.join(process.cwd(), 'apps/bridge'), 'dev'], {
+
+    // Resolve monorepo root even when this CLI is executed from packages/oadm.
+    const findRepoRoot = (startDir: string) => {
+      let dir = startDir;
+      for (let i = 0; i < 10; i++) {
+        if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return dir;
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+      }
+      return startDir;
+    };
+
+    const repoRoot = findRepoRoot(process.cwd());
+    const bridgeDir = path.join(repoRoot, 'apps/bridge');
+
+    await execa('pnpm', ['-C', bridgeDir, 'dev'], {
       stdio: 'inherit',
       env: {
         ...process.env,
