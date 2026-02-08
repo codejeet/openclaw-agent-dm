@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,17 @@ const env = loadEnv();
 const db = openDb();
 
 const app = express();
-app.use(cors());
+
+// CORS: MVP allow any origin (Vercel web UI + tunnels) and allow Authorization header.
+const corsOptions: CorsOptions = {
+  origin: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  maxAge: 86400,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '1mb' }));
 
 const server = http.createServer(app);
