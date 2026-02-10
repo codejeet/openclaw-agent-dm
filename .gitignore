@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+.env
+.oadm
+.vercel
+apps/bridge/dist
+packages/oadm/dist
+apps/web/.next
+apps/web/out
